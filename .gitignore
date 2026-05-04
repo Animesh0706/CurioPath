@@ -52,6 +52,8 @@ yarn-error.log*
 .agent/
 .gemini/
 .gsd/
+scratch/
+fetch-ui.js
 GSD-STYLE.md
 PRD.md
 progress.txt

@@ -5,7 +5,7 @@ const Layout = () => {
   return (
     <div>
       <Navbar />
-      <main style={{ padding: "2rem", maxWidth: "900px", margin: "0 auto" }}>
+      <main className="pt-[104px] px-margin max-w-screen-2xl mx-auto min-h-screen">
         <Outlet />
       </main>
     </div>

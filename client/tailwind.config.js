@@ -43,10 +43,22 @@ export default {
         'on-background': '#e5e2e3'
       },
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        display: ['Inter', 'sans-serif'],
-        body: ['Inter', 'sans-serif'],
-        label: ['Inter', 'sans-serif'],
+        "display-xl": ["Inter", "sans-serif"],
+        "headline-md": ["Inter", "sans-serif"],
+        "body-md": ["Inter", "sans-serif"],
+        "label-sm": ["Inter", "sans-serif"],
+        "body-lg": ["Inter", "sans-serif"],
+        "headline-lg": ["Inter", "sans-serif"],
+        "label-md": ["Inter", "sans-serif"]
+      },
+      fontSize: {
+        "display-xl": ["60px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+        "label-sm": ["12px", { "lineHeight": "1.2", "fontWeight": "600" }],
+        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+        "headline-lg": ["36px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+        "label-md": ["14px", { "lineHeight": "1.4", "letterSpacing": "0.02em", "fontWeight": "500" }]
       },
       spacing: {
         unit: '4px',

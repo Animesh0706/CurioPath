@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { pathAPI } from "../api/pathAPI";
 import { progressAPI } from "../api/progressAPI";
@@ -9,7 +9,10 @@ const PathDetailPage = () => {
   const { id } = useParams();
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
+  
   const [addResourceId, setAddResourceId] = useState("");
+  const [addError, setAddError] = useState("");
 
   const { data: path, isLoading } = useQuery({
     queryKey: ["path", id],
@@ -26,7 +29,14 @@ const PathDetailPage = () => {
 
   const addMut = useMutation({
     mutationFn: (rid) => pathAPI.addResource(id, rid),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["path", id] }); setAddResourceId(""); },
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ["path", id] }); 
+      setAddResourceId(""); 
+      setAddError("");
+    },
+    onError: (err) => {
+      setAddError(err.response?.data?.message || "Failed to add resource");
+    }
   });
 
   const removeMut = useMutation({
@@ -39,55 +49,169 @@ const PathDetailPage = () => {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["pathProgress", id] }); },
   });
 
-  if (isLoading) return <p>Loading...</p>;
-  if (!path) return <p>Path not found.</p>;
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center"><span className="material-symbols-outlined spinner text-4xl text-primary">autorenew</span></div>;
+  if (!path) return <div className="min-h-screen flex items-center justify-center text-on-surface-variant">Path not found.</div>;
 
   const pMap = {};
   progressData?.resources?.forEach((r) => { pMap[r.resourceId] = r.status; });
+  
+  const isOwner = user && path.creatorId === user.id;
+
+  const getTypeStyle = (type) => {
+    switch (type) {
+      case "VIDEO": return { icon: "play_circle", bg: "bg-tertiary/20 text-tertiary", badge: "bg-tertiary/10 border-tertiary/20 text-tertiary" };
+      case "ARTICLE": return { icon: "article", bg: "bg-primary/20 text-primary", badge: "bg-primary/10 border-primary/20 text-primary" };
+      case "COURSE": return { icon: "school", bg: "bg-secondary/20 text-secondary", badge: "bg-secondary/10 border-secondary/20 text-secondary" };
+      case "BOOK": return { icon: "menu_book", bg: "bg-surface-container-highest text-on-surface", badge: "bg-surface-container-highest border-outline-variant text-on-surface" };
+      default: return { icon: "insert_drive_file", bg: "bg-surface-container-highest text-on-surface-variant", badge: "bg-surface-container border-outline text-outline" };
+    }
+  };
+
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case "COMPLETED": return "border-l-4 border-l-tertiary bg-tertiary-container/5";
+      case "IN_PROGRESS": return "border-l-4 border-l-primary bg-primary-container/5";
+      default: return "hover:border-l-4 hover:border-l-outline-variant";
+    }
+  };
 
   return (
-    <div>
-      <h1>{path.title}</h1>
-      <p style={{ color: "#666" }}>{path.description}</p>
-      <small>By {path.creator?.name}</small>
-
-      {progressData && (
-        <div style={{ margin: "1.5rem 0", padding: "1rem", border: "1px solid #ccc", borderRadius: "8px" }}>
-          <h3>Progress</h3>
-          <div style={{ background: "#eee", borderRadius: "4px", height: "20px", overflow: "hidden" }}>
-            <div style={{ background: "#4caf50", height: "100%", width: `${progressData.percentage}%` }} />
+    <div className="animate-fade-in relative min-h-screen pb-20 max-w-5xl mx-auto">
+      {/* Hero Header */}
+      <header className="relative pt-12 pb-12 overflow-hidden border-b border-white/5 mb-12">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 text-primary mb-4 font-label-md">
+            <Link to="/paths" className="hover:text-primary-fixed-dim transition-colors">Paths</Link>
+            <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+            <span className="text-on-surface-variant">{path.title}</span>
           </div>
-          <small>{progressData.completed}/{progressData.totalResources} ({progressData.percentage}%)</small>
+          <h1 className="font-display-xl text-on-surface mb-6 leading-tight tracking-tighter">{path.title}</h1>
+          <p className="font-body-lg text-on-surface-variant max-w-3xl mb-12">
+            {path.description}
+          </p>
+
+          {/* Progress Section */}
+          {progressData && (
+            <div className="glass-card rounded-xl p-md">
+              <div className="flex justify-between items-end mb-4">
+                <div>
+                  <span className="block font-label-sm text-on-surface-variant mb-1 uppercase tracking-wider">Path Progress</span>
+                  <span className="font-headline-md text-primary">{Math.round(progressData.percentage)}%</span>
+                </div>
+                <div className="font-label-md text-on-surface-variant">
+                  {progressData.completed} of {progressData.totalResources} resources completed
+                </div>
+              </div>
+              <div className="h-3 w-full bg-surface-container-high rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-primary-container to-primary rounded-full relative transition-all duration-1000" 
+                  style={{ width: `${progressData.percentage}%` }}
+                >
+                  <div className="absolute right-0 top-0 bottom-0 w-4 bg-white/40 blur-[2px]"></div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Add Resource Input Bar */}
+      {isOwner && (
+        <div className="mb-12">
+          {addError && <p className="text-error mb-2">{addError}</p>}
+          <div className="glass-card rounded-xl p-2 flex items-center focus-within:border-primary transition-colors duration-300">
+            <div className="pl-4 pr-2 text-on-surface-variant">
+              <span className="material-symbols-outlined">link</span>
+            </div>
+            <input 
+              className="flex-1 bg-transparent border-none text-on-surface placeholder-on-surface-variant/50 focus:ring-0 font-body-md py-3 px-2 focus:outline-none" 
+              placeholder="Paste existing Resource ID..." 
+              value={addResourceId}
+              onChange={(e) => setAddResourceId(e.target.value)}
+              type="text"
+            />
+            <button 
+              onClick={() => addMut.mutate(addResourceId)} 
+              disabled={!addResourceId || addMut.isPending}
+              className="bg-primary text-on-primary px-6 py-3 rounded-lg font-label-md font-semibold flex items-center gap-2 hover:brightness-110 transition-all disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              {addMut.isPending ? "Adding..." : "Add"}
+            </button>
+          </div>
         </div>
       )}
 
-      {isAuthenticated && (
-        <div style={{ margin: "1rem 0", display: "flex", gap: "0.5rem" }}>
-          <input placeholder="Resource ID" value={addResourceId} onChange={(e) => setAddResourceId(e.target.value)} style={{ flex: 1 }} />
-          <button onClick={() => addMut.mutate(addResourceId)} disabled={!addResourceId}>Add</button>
-        </div>
-      )}
+      {/* Resource List */}
+      <div className="space-y-4">
+        <h2 className="font-headline-md text-on-surface mb-6 flex items-center gap-3">
+          <span className="material-symbols-outlined text-primary">format_list_numbered</span>
+          Learning Modules
+        </h2>
 
-      <h2>Resources ({path.resources?.length || 0})</h2>
-      {path.resources?.map((pr, i) => (
-        <div key={pr.id} style={{ padding: "0.75rem", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center", background: pMap[pr.resourceId] === "COMPLETED" ? "#e8f5e9" : "transparent" }}>
-          <div>
-            <strong>{i + 1}. </strong>
-            <a href={pr.resource?.url} target="_blank" rel="noopener noreferrer">{pr.resource?.title}</a>
-            <span style={{ marginLeft: "0.5rem", color: "#999", fontSize: "0.85rem" }}>[{pr.resource?.type}]</span>
-          </div>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            {isAuthenticated && (
-              <select value={pMap[pr.resourceId] || "TODO"} onChange={(e) => progressMut.mutate({ resourceId: pr.resourceId, status: e.target.value })}>
-                <option value="TODO">Todo</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="COMPLETED">Completed</option>
-              </select>
-            )}
-            {isAuthenticated && <button onClick={() => removeMut.mutate(pr.resourceId)} style={{ color: "red" }}>Remove</button>}
-          </div>
-        </div>
-      ))}
+        {path.resources?.length === 0 && (
+          <p className="text-on-surface-variant">No resources added to this path yet.</p>
+        )}
+
+        {path.resources?.map((pr, index) => {
+          const res = pr.resource;
+          const status = pMap[res.id] || "TODO";
+          const style = getTypeStyle(res.type);
+          const isCompleted = status === "COMPLETED";
+
+          return (
+            <div 
+              key={pr.id} 
+              className={`glass-card rounded-lg p-4 flex flex-col md:flex-row items-start md:items-center gap-4 group transition-all duration-300 ${getStatusStyle(status)}`}
+            >
+              <div className="hidden md:flex text-on-surface-variant opacity-50">
+                <span className="material-symbols-outlined">drag_indicator</span>
+              </div>
+              
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-headline-md border border-white/5 ${isCompleted ? style.bg : 'bg-surface-container-high text-on-surface-variant'}`}>
+                {isCompleted ? <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span> : (index + 1)}
+              </div>
+              
+              <div className="flex-1 min-w-0 w-full cursor-pointer" onClick={() => window.open(res.url, "_blank")}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`px-2 py-0.5 rounded-full font-label-sm text-[10px] uppercase tracking-wider border ${style.badge}`}>
+                    {res.type}
+                  </span>
+                  <h3 className={`font-body-md font-medium text-on-surface truncate group-hover:text-primary transition-colors ${isCompleted ? 'opacity-70' : ''}`}>
+                    {res.title}
+                  </h3>
+                </div>
+                <p className="font-label-sm text-on-surface-variant truncate pr-4">{res.description}</p>
+              </div>
+              
+              <div className="flex items-center gap-3 w-full md:w-auto mt-4 md:mt-0 justify-end">
+                {isAuthenticated && (
+                  <select 
+                    className="bg-surface-container border border-outline-variant text-on-surface text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 appearance-none font-label-md cursor-pointer pr-8"
+                    value={status} 
+                    onChange={(e) => progressMut.mutate({ resourceId: res.id, status: e.target.value })}
+                  >
+                    <option value="TODO">Todo</option>
+                    <option value="IN_PROGRESS">In Progress</option>
+                    <option value="COMPLETED">Completed</option>
+                  </select>
+                )}
+                
+                {isOwner && (
+                  <button 
+                    onClick={() => removeMut.mutate(res.id)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-error/20 hover:text-error transition-colors md:opacity-0 group-hover:opacity-100"
+                    title="Remove from path"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

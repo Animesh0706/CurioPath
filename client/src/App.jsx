@@ -10,13 +10,7 @@ import ResourcesPage from "./pages/ResourcesPage";
 import PathsPage from "./pages/PathsPage";
 import PathDetailPage from "./pages/PathDetailPage";
 
-const HomePage = () => (
-  <div>
-    <h1>Welcome to CurioPath</h1>
-    <p>Your interactive learning resource platform.</p>
-    <p>Browse resources and learning paths, or register to start tracking your progress.</p>
-  </div>
-);
+import HomePage from "./pages/HomePage";
 
 function App() {
   const checkAuth = useAuthStore((s) => s.checkAuth);
