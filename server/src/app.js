@@ -10,6 +10,15 @@ const AppError = require("./utils/AppError");
 // Import routes
 const authRoutes = require("./routes/authRoutes");
 const resourceRoutes = require("./routes/resourceRoutes");
+const learningPathRoutes = require("./routes/learningPathRoutes");
+const tagRoutes = require("./routes/tagRoutes");
+const progressRoutes = require("./routes/progressRoutes");
+
+// Import tag controller for resource-tag sub-routes
+const tagController = require("./controllers/tagController");
+const validate = require("./middlewares/validate");
+const { attachTagsSchema } = require("./middlewares/schemas/tagSchemas");
+const { protect } = require("./middlewares/auth");
 
 const app = express();
 
@@ -50,6 +59,13 @@ app.get("/api/health", (req, res) => {
 // ─── API Routes ───────────────────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/resources", resourceRoutes);
+app.use("/api/paths", learningPathRoutes);
+app.use("/api/tags", tagRoutes);
+app.use("/api/progress", progressRoutes);
+
+// ─── Resource Tag Sub-Routes ──────────────────────────────
+app.post("/api/resources/:resourceId/tags", protect, validate(attachTagsSchema), tagController.attachTags);
+app.delete("/api/resources/:resourceId/tags/:tagId", protect, tagController.detachTag);
 
 // ─── 404 Handler ──────────────────────────────────────────
 app.use((req, res, next) => {

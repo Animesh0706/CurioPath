@@ -33,12 +33,16 @@ const getAllResources = catchAsync(async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
   const type = req.query.type || undefined;
   const search = req.query.search || undefined;
+  const tags = req.query.tags
+    ? req.query.tags.split(",").map((t) => t.trim().toLowerCase())
+    : undefined;
 
   const result = await resourceService.getAllResources({
     page,
     limit,
     type,
     search,
+    tags,
   });
 
   res.status(200).json({

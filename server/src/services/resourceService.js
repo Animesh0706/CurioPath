@@ -16,7 +16,7 @@ const createResource = async ({ title, url, type, description, authorId }) => {
 /**
  * Get all resources with optional pagination.
  */
-const getAllResources = async ({ page = 1, limit = 10, type, search }) => {
+const getAllResources = async ({ page = 1, limit = 10, type, search, tags }) => {
   const skip = (page - 1) * limit;
 
   const where = {};
@@ -31,6 +31,17 @@ const getAllResources = async ({ page = 1, limit = 10, type, search }) => {
     where.title = {
       contains: search,
       mode: "insensitive",
+    };
+  }
+
+  // Filter by tags if provided (comma-separated tag names)
+  if (tags && tags.length > 0) {
+    where.tags = {
+      some: {
+        tag: {
+          name: { in: tags },
+        },
+      },
     };
   }
 
