@@ -1,0 +1,96 @@
+// CurioPath Database Schema
+// Prisma ORM with PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  role          String         @default("USER") // USER or ADMIN
+  resources     Resource[]
+  learningPaths LearningPath[]
+  progress      UserProgress[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([email])
+}
+
+model Resource {
+  id          String        @id @default(uuid())
+  title       String
+  url         String
+  type        String        // VIDEO, ARTICLE, COURSE
+  description String?
+  authorId    String
+  author      User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  paths       PathResource[]
+  tags        ResourceTag[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([authorId])
+  @@index([type])
+}
+
+model LearningPath {
+  id          String         @id @default(uuid())
+  title       String
+  description String
+  creatorId   String
+  creator     User           @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  resources   PathResource[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([creatorId])
+}
+
+model PathResource {
+  id         String       @id @default(uuid())
+  pathId     String
+  resourceId String
+  orderIndex Int
+  path       LearningPath @relation(fields: [pathId], references: [id], onDelete: Cascade)
+  resource   Resource     @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@unique([pathId, resourceId])
+  @@index([pathId])
+}
+
+model UserProgress {
+  id         String   @id @default(uuid())
+  userId     String
+  resourceId String
+  status     String   @default("TODO") // TODO, IN_PROGRESS, COMPLETED
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, resourceId])
+  @@index([userId])
+}
+
+model Tag {
+  id        String        @id @default(uuid())
+  name      String        @unique
+  resources ResourceTag[]
+}
+
+model ResourceTag {
+  resourceId String
+  tagId      String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([resourceId, tagId])
+}
