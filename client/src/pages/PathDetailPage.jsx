@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { pathAPI } from "../api/pathAPI";
 import { progressAPI } from "../api/progressAPI";
 import { resourceAPI } from "../api/resourceAPI";
@@ -73,6 +74,68 @@ const PathDetailPage = () => {
       queryClient.invalidateQueries({ queryKey: ["pathProgress", id] });
     },
   });
+
+  const reorderMut = useMutation({
+    mutationFn: (orderedItems) => pathAPI.reorder(id, orderedItems),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["path", id] });
+    },
+    onMutate: async (newOrderedItems) => {
+      await queryClient.cancelQueries({ queryKey: ["path", id] });
+      const previousPath = queryClient.getQueryData(["path", id]);
+
+      // Optimistically update the UI to avoid flicker
+      queryClient.setQueryData(["path", id], (old) => {
+        if (!old) return old;
+        const newResources = [...old.data.data.path.resources];
+        // Re-sort the array based on the newOrderedItems indices
+        const sortedMap = new Map(newOrderedItems.map((item, idx) => [item.resourceId, idx]));
+        newResources.sort((a, b) => {
+          return (sortedMap.get(a.resourceId) ?? Infinity) - (sortedMap.get(b.resourceId) ?? Infinity);
+        });
+
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            data: {
+              ...old.data.data,
+              path: {
+                ...old.data.data.path,
+                resources: newResources
+              }
+            }
+          }
+        };
+      });
+
+      return { previousPath };
+    },
+    onError: (err, newOrderedItems, context) => {
+      queryClient.setQueryData(["path", id], context.previousPath);
+    },
+  });
+
+  const handleDragEnd = (result) => {
+    if (!result.destination) return;
+    
+    const sourceIndex = result.source.index;
+    const destinationIndex = result.destination.index;
+    
+    if (sourceIndex === destinationIndex) return;
+    
+    const items = Array.from(path.resources);
+    const [reorderedItem] = items.splice(sourceIndex, 1);
+    items.splice(destinationIndex, 0, reorderedItem);
+    
+    // Map to array of { resourceId, orderIndex }
+    const orderedPayload = items.map((item, index) => ({
+      resourceId: item.resource.id,
+      orderIndex: index
+    }));
+    
+    reorderMut.mutate(orderedPayload);
+  };
 
   if (isLoading)
     return (
@@ -245,79 +308,99 @@ const PathDetailPage = () => {
         </div>
       )}
 
-      {/* Resource List */}
-      <div className="space-y-4">
-        <h2 className="font-headline-md text-on-surface mb-6 flex items-center gap-3">
-          <span className="material-symbols-outlined text-primary">format_list_numbered</span>
-          Learning Modules
-        </h2>
-
-        {path.resources?.length === 0 && (
-          <p className="text-on-surface-variant">No resources added to this path yet.</p>
-        )}
-
-        {path.resources?.map((pr, index) => {
-          const res = pr.resource;
-          const status = pMap[res.id] || "TODO";
-          const style = getTypeStyle(res.type);
-          const isCompleted = status === "COMPLETED";
-
-          return (
-            <div
-              key={pr.id}
-              className={`glass-card rounded-lg p-4 flex flex-col md:flex-row items-start md:items-center gap-4 group transition-all duration-300 ${getStatusStyle(status)}`}
+      {/* Resource List with Drag and Drop */}
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId="path-resources" isDropDisabled={!isOwner}>
+          {(provided) => (
+            <div 
+              className="space-y-4"
+              {...provided.droppableProps}
+              ref={provided.innerRef}
             >
-              <div className="hidden md:flex text-on-surface-variant opacity-50">
-                <span className="material-symbols-outlined">drag_indicator</span>
-              </div>
+              <h2 className="font-headline-md text-on-surface mb-6 flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary">format_list_numbered</span>
+                Learning Modules
+              </h2>
 
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-headline-md border border-white/5 ${isCompleted ? style.bg : "bg-surface-container-high text-on-surface-variant"}`}>
-                {isCompleted ? (
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                ) : (
-                  index + 1
-                )}
-              </div>
+              {path.resources?.length === 0 && (
+                <p className="text-on-surface-variant">No resources added to this path yet.</p>
+              )}
 
-              <div className="flex-1 min-w-0 w-full cursor-pointer" onClick={() => window.open(res.url, "_blank")}>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`px-2 py-0.5 rounded-full font-label-sm text-[10px] uppercase tracking-wider border ${style.badge}`}>
-                    {res.type}
-                  </span>
-                  <h3 className={`font-body-md font-medium text-on-surface truncate group-hover:text-primary transition-colors ${isCompleted ? "opacity-70" : ""}`}>
-                    {res.title}
-                  </h3>
-                </div>
-                <p className="font-label-sm text-on-surface-variant truncate pr-4">{res.description}</p>
-              </div>
+              {path.resources?.map((pr, index) => {
+                const res = pr.resource;
+                const status = pMap[res.id] || "TODO";
+                const style = getTypeStyle(res.type);
+                const isCompleted = status === "COMPLETED";
 
-              <div className="flex items-center gap-3 w-full md:w-auto mt-4 md:mt-0 justify-end">
-                {isAuthenticated && (
-                  <select
-                    className="bg-surface-container border border-outline-variant text-on-surface text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 appearance-none font-label-md cursor-pointer pr-8"
-                    value={status}
-                    onChange={(e) => progressMut.mutate({ resourceId: res.id, status: e.target.value })}
-                  >
-                    <option value="TODO">Todo</option>
-                    <option value="IN_PROGRESS">In Progress</option>
-                    <option value="COMPLETED">Completed</option>
-                  </select>
-                )}
+                return (
+                  <Draggable key={pr.id} draggableId={pr.id} index={index} isDragDisabled={!isOwner}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        className={`glass-card rounded-lg p-4 flex flex-col md:flex-row items-start md:items-center gap-4 group transition-all duration-300 ${getStatusStyle(status)} ${snapshot.isDragging ? 'shadow-2xl shadow-primary/20 scale-[1.02] border-primary/50 z-50' : ''}`}
+                        style={provided.draggableProps.style}
+                      >
+                        <div 
+                          className={`hidden md:flex text-on-surface-variant opacity-50 ${isOwner ? 'cursor-grab active:cursor-grabbing hover:opacity-100' : ''}`}
+                          {...provided.dragHandleProps}
+                        >
+                          <span className="material-symbols-outlined">drag_indicator</span>
+                        </div>
 
-                {isOwner && (
-                  <button
-                    onClick={() => removeMut.mutate(res.id)}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-error/20 hover:text-error transition-colors md:opacity-0 group-hover:opacity-100"
-                    title="Remove from path"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">close</span>
-                  </button>
-                )}
-              </div>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 font-headline-md border border-white/5 ${isCompleted ? style.bg : "bg-surface-container-high text-on-surface-variant"}`}>
+                          {isCompleted ? (
+                            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                          ) : (
+                            index + 1
+                          )}
+                        </div>
+
+                        <div className="flex-1 min-w-0 w-full cursor-pointer" onClick={() => window.open(res.url, "_blank")}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`px-2 py-0.5 rounded-full font-label-sm text-[10px] uppercase tracking-wider border ${style.badge}`}>
+                              {res.type}
+                            </span>
+                            <h3 className={`font-body-md font-medium text-on-surface truncate group-hover:text-primary transition-colors ${isCompleted ? "opacity-70" : ""}`}>
+                              {res.title}
+                            </h3>
+                          </div>
+                          <p className="font-label-sm text-on-surface-variant truncate pr-4">{res.description}</p>
+                        </div>
+
+                        <div className="flex items-center gap-3 w-full md:w-auto mt-4 md:mt-0 justify-end">
+                          {isAuthenticated && (
+                            <select
+                              className="bg-surface-container border border-outline-variant text-on-surface text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 appearance-none font-label-md cursor-pointer pr-8"
+                              value={status}
+                              onChange={(e) => progressMut.mutate({ resourceId: res.id, status: e.target.value })}
+                            >
+                              <option value="TODO">Todo</option>
+                              <option value="IN_PROGRESS">In Progress</option>
+                              <option value="COMPLETED">Completed</option>
+                            </select>
+                          )}
+
+                          {isOwner && (
+                            <button
+                              onClick={() => removeMut.mutate(res.id)}
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-error/20 hover:text-error transition-colors md:opacity-0 group-hover:opacity-100"
+                              title="Remove from path"
+                            >
+                              <span className="material-symbols-outlined text-[20px]">close</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </Draggable>
+                );
+              })}
+              {provided.placeholder}
             </div>
-          );
-        })}
-      </div>
+          )}
+        </Droppable>
+      </DragDropContext>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { pathAPI } from "../api/pathAPI";
 import useAuthStore from "../stores/authStore";
 
@@ -136,7 +137,15 @@ const PathsPage = () => {
       )}
 
       {/* Path List */}
-      <section className="space-y-md relative z-10">
+      <motion.section 
+        variants={{
+          hidden: { opacity: 0 },
+          show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+        }}
+        initial="hidden"
+        animate="show"
+        className="space-y-md relative z-10"
+      >
         {isLoading && <div className="text-center py-10"><span className="material-symbols-outlined spinner text-4xl text-primary">autorenew</span></div>}
         {error && <div className="text-center py-10 text-error">Error loading paths.</div>}
         {data?.paths?.length === 0 && <div className="text-center py-10 text-on-surface-variant">No learning paths found.</div>}
@@ -144,10 +153,15 @@ const PathsPage = () => {
         {data?.paths?.map((path, index) => {
           const style = getGradientAndIcon(index);
           return (
-            <article 
+            <motion.article 
               key={path.id} 
+              variants={{
+                hidden: { opacity: 0, x: -20 },
+                show: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+              }}
+              whileHover={{ scale: 1.01, transition: { type: "spring", stiffness: 400, damping: 25 } }}
               onClick={() => navigate(`/paths/${path.id}`)}
-              className="glass-card rounded-xl p-md flex flex-col sm:flex-row gap-6 cursor-pointer hover:shadow-[0_0_20px_rgba(208,188,255,0.1)] transition-all group"
+              className="glass-card rounded-xl p-md flex flex-col sm:flex-row gap-6 cursor-pointer hover:shadow-[0_0_20px_rgba(208,188,255,0.15)] transition-all group"
             >
               <div className={`w-full sm:w-48 h-32 rounded-lg bg-gradient-to-br ${style.bg} flex-shrink-0 relative overflow-hidden flex items-center justify-center group-hover:shadow-lg transition-all`}>
                 <span className="material-symbols-outlined text-white/50 text-5xl group-hover:scale-110 transition-transform duration-500">{style.icon}</span>
@@ -185,10 +199,10 @@ const PathsPage = () => {
                   </span>
                 </div>
               </div>
-            </article>
+            </motion.article>
           );
         })}
-      </section>
+      </motion.section>
 
       {/* Pagination */}
       {data?.pagination && data.pagination.totalPages > 1 && (

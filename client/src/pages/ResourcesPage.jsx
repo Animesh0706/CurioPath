@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { resourceAPI } from "../api/resourceAPI";
 import useAuthStore from "../stores/authStore";
 
@@ -172,13 +173,30 @@ const ResourcesPage = () => {
       )}
 
       {/* Bento Grid / Cards */}
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 relative z-10">
+      <motion.section 
+        variants={{
+          hidden: { opacity: 0 },
+          show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+        }}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 relative z-10"
+      >
         {isLoading && <div className="col-span-full text-center py-10"><span className="material-symbols-outlined spinner text-4xl text-primary">autorenew</span></div>}
         {error && <div className="col-span-full text-center py-10 text-error">Error loading resources.</div>}
         {data?.resources?.length === 0 && <div className="col-span-full text-center py-10 text-on-surface-variant">No resources found matching your criteria.</div>}
 
         {data?.resources?.map((resource) => (
-          <article key={resource.id} className="glass-card rounded-xl p-md flex flex-col group relative overflow-hidden transition-all hover:shadow-[0_0_20px_rgba(208,188,255,0.1)] hover:-translate-y-1 cursor-pointer" onClick={() => window.open(resource.url, "_blank")}>
+          <motion.article 
+            key={resource.id} 
+            variants={{
+              hidden: { opacity: 0, y: 20 },
+              show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+            }}
+            whileHover={{ scale: 1.02, y: -4, transition: { type: "spring", stiffness: 400, damping: 25 } }}
+            className="glass-card rounded-xl p-md flex flex-col group relative overflow-hidden transition-all hover:shadow-[0_0_20px_rgba(208,188,255,0.15)] cursor-pointer" 
+            onClick={() => window.open(resource.url, "_blank")}
+          >
             
             {isOwner(resource) && (
               <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
@@ -214,9 +232,9 @@ const ResourcesPage = () => {
               </div>
               <span className="material-symbols-outlined text-outline opacity-0 group-hover:opacity-100 transition-opacity">open_in_new</span>
             </div>
-          </article>
+          </motion.article>
         ))}
-      </section>
+      </motion.section>
 
       {/* Pagination */}
       {data?.pagination && data.pagination.totalPages > 1 && (
